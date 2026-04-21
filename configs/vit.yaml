@@ -1,14 +1,14 @@
 seed: 42
-experiment_name: vit_cifar10
-output_dir: outputs
+experiment_name: vit_cifar10_bs512
+output_dir: outputs/vit_cifar10_bs512
 
 dataset:
   name: cifar10
   data_dir: ./data
   image_size: 32
   val_split: 0.1
-  batch_size: 128
-  num_workers: 4
+  batch_size: 512
+  num_workers: 8
 
 model:
   type: vit
