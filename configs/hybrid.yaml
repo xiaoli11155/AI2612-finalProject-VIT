@@ -1,0 +1,39 @@
+seed: 42
+experiment_name: hybrid_cifar10
+output_dir: outputs
+
+dataset:
+  name: cifar10
+  data_dir: ./data
+  image_size: 32
+  val_split: 0.1
+  batch_size: 128
+  num_workers: 4
+
+model:
+  type: hybrid
+  image_size: 32
+  stem_channels: [64, 128]
+  embed_dim: 192
+  depth: 6
+  num_heads: 3
+  mlp_ratio: 4.0
+  dropout: 0.1
+  attention_dropout: 0.0
+  drop_path_rate: 0.1
+
+train:
+  epochs: 100
+  lr: 0.0005
+  weight_decay: 0.05
+  betas: [0.9, 0.999]
+  warmup_epochs: 5
+  min_lr_ratio: 0.01
+  label_smoothing: 0.1
+  grad_clip: 1.0
+  use_amp: true
+  mixup_alpha: 0.2
+  save_every: 10
+
+eval:
+  topk: [1, 5]
