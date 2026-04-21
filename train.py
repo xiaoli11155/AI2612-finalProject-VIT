@@ -5,9 +5,9 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 from torch.cuda.amp import GradScaler, autocast
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from datasets import build_dataloaders
@@ -119,13 +119,16 @@ def main():
     output_dir = Path(cfg.get("output_dir", "outputs"))
     ckpt_dir = output_dir / "checkpoints"
     log_dir = output_dir / "logs"
+    tb_dir = output_dir / "tensorboard"
     fig_dir = output_dir / "figures"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
+    tb_dir.mkdir(parents=True, exist_ok=True)
     fig_dir.mkdir(parents=True, exist_ok=True)
 
     exp_name = cfg.get("experiment_name", Path(args.config).stem)
     csv_logger = CSVLogger(str(log_dir / f"{exp_name}.csv"))
+    tb_writer = SummaryWriter(log_dir=str(tb_dir / exp_name))
     save_json(cfg, str(log_dir / f"{exp_name}_config.json"))
 
     loaders, num_classes = build_dataloaders(cfg["dataset"], seed=seed)
@@ -211,6 +214,26 @@ def main():
             "train_time_sec": epoch_time,
         }
         csv_logger.log(row)
+        tb_writer.add_scalar("train/loss", train_metrics["loss"], epoch + 1)
+        tb_writer.add_scalar("val/loss", val_metrics["loss"], epoch + 1)
+        tb_writer.add_scalar("test/loss", test_metrics["loss"], epoch + 1)
+        tb_writer.add_scalar("train/top1", train_metrics.get("top1", 0.0), epoch + 1)
+        tb_writer.add_scalar("val/top1", val_metrics.get("top1", 0.0), epoch + 1)
+        tb_writer.add_scalar("test/top1", test_metrics.get("top1", 0.0), epoch + 1)
+        tb_writer.add_scalar("train/top5", train_metrics.get("top5", 0.0), epoch + 1)
+        tb_writer.add_scalar("val/top5", val_metrics.get("top5", 0.0), epoch + 1)
+        tb_writer.add_scalar("test/top5", test_metrics.get("top5", 0.0), epoch + 1)
+        tb_writer.add_scalar("train/f1_macro", train_metrics.get("f1_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("val/f1_macro", val_metrics.get("f1_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("test/f1_macro", test_metrics.get("f1_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("train/precision_macro", train_metrics.get("precision_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("val/precision_macro", val_metrics.get("precision_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("test/precision_macro", test_metrics.get("precision_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("train/recall_macro", train_metrics.get("recall_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("val/recall_macro", val_metrics.get("recall_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("test/recall_macro", test_metrics.get("recall_macro", 0.0), epoch + 1)
+        tb_writer.add_scalar("train/lr", lr, epoch + 1)
+        tb_writer.add_scalar("train/time_sec", epoch_time, epoch + 1)
 
         current_top1 = val_metrics.get("top1", 0.0)
         state = {
@@ -246,6 +269,7 @@ def main():
         "num_parameters": count_parameters(model),
     }
     save_json(final_summary, str(log_dir / f"{exp_name}_summary.json"))
+    tb_writer.close()
     print("Training finished.")
 
 
