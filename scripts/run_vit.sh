@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-python train.py --config configs/vit.yaml
+CONFIG_PATH="${1:-configs/vit_cifar100.yaml}"
+python train.py --config "$CONFIG_PATH"

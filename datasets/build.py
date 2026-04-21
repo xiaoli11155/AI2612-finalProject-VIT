@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, Tuple
 
 import torch
 from torch.utils.data import DataLoader, Subset, random_split
 from torchvision import datasets, transforms
+from torchvision.datasets.folder import default_loader
 
 
 DATASET_META = {
@@ -46,6 +48,54 @@ def _split_train_val(dataset, val_split: float, seed: int):
     return train_subset, val_subset
 
 
+class TinyImageNetValDataset(torch.utils.data.Dataset):
+    def __init__(self, samples, transform=None):
+        self.samples = samples
+        self.transform = transform
+        self.loader = default_loader
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        image = self.loader(path)
+        if self.transform is not None:
+            image = self.transform(image)
+        return image, target
+
+
+def _build_tiny_imagenet_val_dataset(val_dir: str, transform):
+    val_path = Path(val_dir)
+    class_dirs = [p for p in val_path.iterdir() if p.is_dir() and p.name != "images"]
+    if class_dirs:
+        return datasets.ImageFolder(root=val_dir, transform=transform)
+
+    ann_path = val_path / "val_annotations.txt"
+    images_dir = val_path / "images"
+    if not ann_path.exists() or not images_dir.exists():
+        raise FileNotFoundError(
+            f"Tiny-ImageNet val split not found in expected format under: {val_dir}"
+        )
+
+    samples = []
+    class_names = set()
+    with ann_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            parts = line.strip().split("\t")
+            if len(parts) < 2:
+                continue
+            image_name, class_name = parts[0], parts[1]
+            image_path = images_dir / image_name
+            if image_path.exists():
+                samples.append((str(image_path), class_name))
+                class_names.add(class_name)
+
+    class_to_idx = {cls_name: idx for idx, cls_name in enumerate(sorted(class_names))}
+    indexed_samples = [(path, class_to_idx[class_name]) for path, class_name in samples]
+    return TinyImageNetValDataset(indexed_samples, transform=transform)
+
+
 def build_dataloaders(cfg: Dict, seed: int):
     dataset_name = cfg["name"].lower()
     data_dir = cfg.get("data_dir", "./data")
@@ -80,7 +130,7 @@ def build_dataloaders(cfg: Dict, seed: int):
         if isinstance(val_set, Subset):
             base = datasets.ImageFolder(root=train_dir, transform=eval_transform)
             val_set = Subset(base, val_set.indices)
-        test_set = datasets.ImageFolder(root=val_dir, transform=eval_transform)
+        test_set = _build_tiny_imagenet_val_dataset(val_dir=val_dir, transform=eval_transform)
         num_classes = len(full_train.classes)
     else:
         raise ValueError(f"Unsupported dataset: {dataset_name}")

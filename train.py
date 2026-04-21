@@ -41,8 +41,9 @@ def train_one_epoch(
 ):
     model.train()
     total_loss = 0.0
-    all_logits = []
-    all_targets = []
+    topk = sorted(topk)
+    topk_correct = {k: 0.0 for k in topk}
+    total_seen = 0
 
     pbar = tqdm(loader, desc="train", leave=False)
     for images, targets in pbar:
@@ -66,15 +67,27 @@ def train_one_epoch(
         scaler.update()
 
         total_loss += loss.item() * targets.size(0)
-        all_logits.append(logits.detach().cpu())
-        all_targets.append(targets.detach().cpu())
+
+        with torch.no_grad():
+            maxk = max(topk)
+            preds = logits.topk(maxk, dim=1, largest=True, sorted=True).indices
+            total_seen += targets.size(0)
+            if mixup_alpha > 0:
+                # For mixup training, count weighted correctness for both source labels.
+                for k in topk:
+                    correct_a = preds[:, :k].eq(y_a.unsqueeze(1)).any(dim=1).float().sum().item()
+                    correct_b = preds[:, :k].eq(y_b.unsqueeze(1)).any(dim=1).float().sum().item()
+                    topk_correct[k] += lam * correct_a + (1 - lam) * correct_b
+            else:
+                for k in topk:
+                    correct = preds[:, :k].eq(targets.unsqueeze(1)).any(dim=1).float().sum().item()
+                    topk_correct[k] += correct
+
         pbar.set_postfix({"loss": f"{loss.item():.4f}", "lr": optimizer.param_groups[0]["lr"]})
 
     scheduler.step()
 
-    logits_cat = torch.cat(all_logits, dim=0)
-    targets_cat = torch.cat(all_targets, dim=0)
-    metrics = compute_classification_metrics(logits_cat, targets_cat, num_classes=num_classes, topk=topk)
+    metrics = {f"top{k}": (topk_correct[k] * 100.0 / max(1, total_seen)) for k in topk}
     metrics["loss"] = total_loss / len(loader.dataset)
     return metrics
 
