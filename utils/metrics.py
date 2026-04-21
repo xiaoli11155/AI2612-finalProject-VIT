@@ -6,6 +6,9 @@ import torch
 
 
 def topk_accuracy(logits: torch.Tensor, targets: torch.Tensor, topk: Iterable[int]) -> Dict[int, float]:
+    # CPU topk does not support float16, so ensure a safe dtype.
+    if logits.dtype in (torch.float16, torch.bfloat16):
+        logits = logits.float()
     maxk = max(topk)
     _, pred = logits.topk(maxk, 1, True, True)
     pred = pred.t()
