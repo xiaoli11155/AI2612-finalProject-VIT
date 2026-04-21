@@ -27,7 +27,9 @@ def evaluate(model, loader, criterion, device, num_classes, topk):
 
     logits = torch.cat(all_logits, dim=0)
     targets = torch.cat(all_targets, dim=0)
-    metrics = compute_classification_metrics(logits, targets, num_classes=num_classes, topk=topk)
+    metrics = compute_classification_metrics(
+        logits, targets, num_classes=num_classes, topk=topk
+    )
     metrics["loss"] = total_loss / len(loader.dataset)
     return metrics
 
@@ -36,8 +38,12 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate a trained model checkpoint")
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--split", type=str, default="test", choices=["train", "val", "test"])
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument(
+        "--split", type=str, default="test", choices=["train", "val", "test"]
+    )
+    parser.add_argument(
+        "--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu"
+    )
     return parser.parse_args()
 
 
@@ -45,7 +51,9 @@ def main():
     args = parse_args()
     cfg = load_config(args.config)
     set_seed(int(cfg.get("seed", 42)))
-    loaders, num_classes = build_dataloaders(cfg["dataset"], seed=int(cfg.get("seed", 42)))
+    loaders, num_classes = build_dataloaders(
+        cfg["dataset"], seed=int(cfg.get("seed", 42))
+    )
 
     model = build_model(cfg["model"], num_classes=num_classes).to(args.device)
     state = torch.load(args.checkpoint, map_location="cpu")
@@ -65,7 +73,10 @@ def main():
     for k, v in metrics.items():
         if k != "confusion_matrix":
             print(f"{k}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}")
-    save_json(metrics, f"{cfg.get('output_dir', 'outputs')}/logs/{cfg.get('experiment_name', 'exp')}_{args.split}_metrics.json")
+    save_json(
+        metrics,
+        f"{cfg.get('output_dir', 'outputs')}/logs/{cfg.get('experiment_name', 'exp')}_{args.split}_metrics.json",
+    )
 
 
 if __name__ == "__main__":
