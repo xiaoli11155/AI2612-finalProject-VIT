@@ -1,0 +1,32 @@
+seed: 42
+experiment_name: resnet18_cifar100_repro
+output_dir: outputs/resnet18_cifar100_repro
+
+dataset:
+  name: cifar100
+  data_dir: ./data
+  image_size: 32
+  val_split: 0.1
+  batch_size: 256
+  num_workers: 8
+
+model:
+  type: resnet
+  variant: resnet18
+  dropout: 0.0
+
+train:
+  epochs: 100
+  lr: 0.001
+  weight_decay: 0.0005
+  betas: [0.9, 0.999]
+  warmup_epochs: 5
+  min_lr_ratio: 0.01
+  label_smoothing: 0.0
+  grad_clip: 1.0
+  use_amp: true
+  mixup_alpha: 0.0
+  save_every: 10
+
+eval:
+  topk: [1, 5]

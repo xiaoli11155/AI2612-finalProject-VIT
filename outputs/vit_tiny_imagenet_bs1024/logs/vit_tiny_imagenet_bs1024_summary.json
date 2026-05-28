@@ -1,6 +1,0 @@
-{
-  "best_val_top1": 43.7599983215332,
-  "experiment_name": "vit_tiny_imagenet_bs1024",
-  "model_type": "vit",
-  "num_parameters": 17921864
-}

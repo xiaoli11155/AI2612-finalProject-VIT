@@ -1,0 +1,50 @@
+{
+  "seed": 42,
+  "experiment_name": "hybrid_tiny_imagenet_repro",
+  "output_dir": "outputs/hybrid_tiny_imagenet_repro",
+  "dataset": {
+    "name": "tiny_imagenet",
+    "data_dir": "./data/tiny-imagenet-200",
+    "image_size": 64,
+    "val_split": 0.1,
+    "batch_size": 256,
+    "num_workers": 8
+  },
+  "model": {
+    "type": "hybrid",
+    "image_size": 64,
+    "stem_channels": [
+      64,
+      128
+    ],
+    "embed_dim": 384,
+    "depth": 8,
+    "num_heads": 6,
+    "mlp_ratio": 4.0,
+    "dropout": 0.1,
+    "attention_dropout": 0.1,
+    "drop_path_rate": 0.15
+  },
+  "train": {
+    "epochs": 150,
+    "lr": 0.0007,
+    "weight_decay": 0.05,
+    "betas": [
+      0.9,
+      0.999
+    ],
+    "warmup_epochs": 10,
+    "min_lr_ratio": 0.001,
+    "label_smoothing": 0.1,
+    "grad_clip": 1.0,
+    "use_amp": true,
+    "mixup_alpha": 0.2,
+    "save_every": 10
+  },
+  "eval": {
+    "topk": [
+      1,
+      5
+    ]
+  }
+}

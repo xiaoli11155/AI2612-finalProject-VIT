@@ -1,13 +1,83 @@
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
 
 
+class DropPath(nn.Module):
+    def __init__(self, drop_prob: float = 0.0):
+        super().__init__()
+        self.drop_prob = float(drop_prob)
+
+    def forward(self, x):
+        if self.drop_prob == 0.0 or not self.training:
+            return x
+        keep_prob = 1.0 - self.drop_prob
+        shape = (x.shape[0],) + (1,) * (x.ndim - 1)
+        random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
+        random_tensor.floor_()
+        return x.div(keep_prob) * random_tensor
+
+
+class MLP(nn.Module):
+    def __init__(self, dim: int, hidden_dim: int, dropout: float = 0.0):
+        super().__init__()
+        self.fc1 = nn.Linear(dim, hidden_dim)
+        self.act = nn.GELU()
+        self.drop1 = nn.Dropout(dropout)
+        self.fc2 = nn.Linear(hidden_dim, dim)
+        self.drop2 = nn.Dropout(dropout)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.drop1(x)
+        x = self.fc2(x)
+        x = self.drop2(x)
+        return x
+
+
+class Attention(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        num_heads: int,
+        qkv_bias: bool = True,
+        attn_dropout: float = 0.0,
+        proj_dropout: float = 0.0,
+    ):
+        super().__init__()
+        if dim % num_heads != 0:
+            raise ValueError("dim must be divisible by num_heads")
+        self.num_heads = num_heads
+        self.head_dim = dim // num_heads
+        self.scale = self.head_dim ** -0.5
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.attn_drop = nn.Dropout(attn_dropout)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_dropout)
+
+    def forward(self, x):
+        bsz, num_tokens, dim = x.shape
+        qkv = self.qkv(x)
+        qkv = qkv.reshape(bsz, num_tokens, 3, self.num_heads, self.head_dim)
+        qkv = qkv.permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)
+
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+
+        x = attn @ v
+        x = x.transpose(1, 2).reshape(bsz, num_tokens, dim)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        return x
+
+
 class TransformerBlock(nn.Module):
-    """
-    Thin wrapper around PyTorch's official TransformerEncoderLayer.
-    This keeps the ViT block interface stable while avoiding manual attention implementation.
-    """
+    """Pre-norm ViT block with explicit attention, MLP, and stochastic depth."""
 
     def __init__(
         self,
@@ -17,23 +87,24 @@ class TransformerBlock(nn.Module):
         dropout: float = 0.0,
         attn_dropout: float = 0.0,
         drop_path: float = 0.0,
+        qkv_bias: bool = True,
     ):
         super().__init__()
         ff_dim = int(dim * mlp_ratio)
-        effective_dropout = max(dropout, drop_path)
-        self.block = nn.TransformerEncoderLayer(
-            d_model=dim,
-            nhead=num_heads,
-            dim_feedforward=ff_dim,
-            dropout=effective_dropout,
-            activation="gelu",
-            batch_first=True,
-            norm_first=True,
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = Attention(
+            dim=dim,
+            num_heads=num_heads,
+            qkv_bias=qkv_bias,
+            attn_dropout=attn_dropout,
+            proj_dropout=dropout,
         )
-
-        # PyTorch does not expose separate attn dropout in this module.
-        # Keep the argument for compatibility with existing configs.
-        self.attn_dropout = attn_dropout
+        self.drop_path1 = DropPath(drop_path) if drop_path > 0 else nn.Identity()
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = MLP(dim=dim, hidden_dim=ff_dim, dropout=dropout)
+        self.drop_path2 = DropPath(drop_path) if drop_path > 0 else nn.Identity()
 
     def forward(self, x):
-        return self.block(x)
+        x = x + self.drop_path1(self.attn(self.norm1(x)))
+        x = x + self.drop_path2(self.mlp(self.norm2(x)))
+        return x

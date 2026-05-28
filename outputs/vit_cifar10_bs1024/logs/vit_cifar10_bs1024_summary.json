@@ -1,6 +1,0 @@
-{
-  "best_val_top1": 81.4000015258789,
-  "experiment_name": "vit_cifar10_bs1024",
-  "model_type": "vit",
-  "num_parameters": 3583306
-}

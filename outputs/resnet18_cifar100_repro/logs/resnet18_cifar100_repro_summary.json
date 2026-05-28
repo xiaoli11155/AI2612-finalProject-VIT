@@ -1,0 +1,6 @@
+{
+  "best_val_top1": 53.81999969482422,
+  "experiment_name": "resnet18_cifar100_repro",
+  "model_type": "resnet",
+  "num_parameters": 11227812
+}

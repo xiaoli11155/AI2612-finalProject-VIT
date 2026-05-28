@@ -17,6 +17,7 @@ from utils import (
     build_warmup_cosine_scheduler,
     compute_classification_metrics,
     load_config,
+    plot_training_curves,
     save_json,
     set_seed,
 )
@@ -282,7 +283,13 @@ def main():
         "num_parameters": count_parameters(model),
     }
     save_json(final_summary, str(log_dir / f"{exp_name}_summary.json"))
+    figure_path = plot_training_curves(
+        csv_path=str(log_dir / f"{exp_name}.csv"),
+        figure_dir=str(fig_dir),
+        experiment_name=exp_name,
+    )
     tb_writer.close()
+    print(f"Saved training curves to: {figure_path}")
     print("Training finished.")
 
 
